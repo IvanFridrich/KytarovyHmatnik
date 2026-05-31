@@ -233,9 +233,10 @@ function renderFretboard(svgEl_, state, onNoteClick) {
         const chromaInt = ((note.chroma - state.rootChroma) + 12) % 12;
         const info = Theory.INTERVAL_NAMES[chromaInt];
         const inScale = note.interval !== null;
+        const outsideLabel = state.mode === 'chord' ? 'mimo akord' : 'mimo stupnici';
         const intervalStr = inScale
           ? `${info.cz} (${info.short})`
-          : `${info.cz} (${info.short}) — mimo stupnici`;
+          : `${info.cz} (${info.short}) — ${outsideLabel}`;
         const freq = Theory.midiToFreq(note.midi).toFixed(1);
         const openMidi    = state.tuningMidi[s];
         const openChroma  = Theory.midiToChroma(openMidi);

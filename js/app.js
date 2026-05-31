@@ -157,13 +157,10 @@ function setState(patch) {
   saveState();
   renderAll();
 
-  // Živý náhled: přehraj pokud se právě něco přehrává, nebo pokud byl právě zapnut
-  if (state.livePlay && Object.keys(patch).some(k => LIVE_TRIGGERS.has(k))) {
-    const justEnabled = 'livePlay' in patch && patch.livePlay === true;
-    if (justEnabled || Audio.isPlaying()) {
-      if (state.mode === 'chord') playLiveChord();
-      else playLiveScale();
-    }
+  // Živý náhled: přehraj pouze pokud se právě něco přehrává
+  if (state.livePlay && Audio.isPlaying() && Object.keys(patch).some(k => LIVE_TRIGGERS.has(k))) {
+    if (state.mode === 'chord') playLiveChord();
+    else playLiveScale();
   }
 }
 
