@@ -294,9 +294,10 @@ function labelPos(cx, cy, r, angleDeg) {
 }
 
 function renderCircleOfFifths(svgEl_, currentRootChroma, notation, onSectorClick,
-                              diatonicMajor = new Set(), diatonicMinor = new Set(), rootIsMajor = true) {
+                              diatonicMajor = new Set(), diatonicMinor = new Set(), rootIsMajor = true, useFlats = false) {
   svgEl_.innerHTML = '';
 
+  const rootPf = useFlats;
   const cof = Theory.getCircleOfFifths(notation);
 
   cof.forEach((entry, i) => {
@@ -307,6 +308,9 @@ function renderCircleOfFifths(svgEl_, currentRootChroma, notation, onSectorClick
     const isMinorActive   = !rootIsMajor && entry.minorChroma === currentRootChroma;
     const isMajorDiatonic = !isMajorActive && diatonicMajor.has(entry.chroma);
     const isMinorDiatonic = !isMinorActive && diatonicMinor.has(entry.minorChroma);
+
+    const outerLabel = Theory.chromaToName(entry.chroma, notation, rootPf);
+    const innerLabel = Theory.chromaToName(entry.minorChroma, notation, rootPf) + 'm';
 
     // Vnější (dur) sektor
     const outerPath = svgEl('path', {
@@ -343,7 +347,7 @@ function renderCircleOfFifths(svgEl_, currentRootChroma, notation, onSectorClick
       'font-size': 13,
       'font-weight': isMajorActive ? 'bold' : isMajorDiatonic ? '600' : '500',
     });
-    outerTx.textContent = entry.majorName;
+    outerTx.textContent = outerLabel;
     outerTx.style.fill = isMajorActive ? 'var(--cof-text-active)' : 'var(--cof-text)';
     outerTx.style.pointerEvents = 'none';
     outerTx.style.userSelect = 'none';
@@ -357,7 +361,7 @@ function renderCircleOfFifths(svgEl_, currentRootChroma, notation, onSectorClick
       'text-anchor': 'middle',
       'font-size': 10,
     });
-    innerTx.textContent = entry.minorName + 'm';
+    innerTx.textContent = innerLabel;
     innerTx.style.fill = isMinorActive ? 'var(--cof-text-active)' : 'var(--cof-text-minor)';
     innerTx.style.pointerEvents = 'none';
     innerTx.style.userSelect = 'none';

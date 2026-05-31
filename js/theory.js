@@ -6,8 +6,9 @@ const NOTES_INTERNATIONAL = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B
 const NOTES_CZECH_SHARP   = ['C','Cis','D','Dis','E','F','Fis','G','Gis','A','Ais','H'];
 const NOTES_CZECH_FLAT    = ['C','Des','D','Es', 'E','F','Ges','G','As', 'A','B',  'H'];
 
-// Béčkové tóniny: F(5), B/Bes(10), Es(3), As(8), Des(1), Ges(6)
-const FLAT_KEYS = new Set([1, 3, 5, 6, 8, 10]);
+// Béčkové tóniny: F(5), B/Bes(10), Es(3), As(8), Des(1)
+// Chroma 6 (Fis/Ges) je enharmonické — výchozí: Fis (křížková strana CoF)
+const FLAT_KEYS = new Set([1, 3, 5, 8, 10]);
 
 function prefersFlats(rootChroma) {
   return FLAT_KEYS.has(rootChroma);
@@ -169,7 +170,7 @@ function getCircleOfFifths(notation) {
   return COF_ORDER.map((chroma, i) => {
     const pf = FLAT_KEYS.has(chroma);
     const minorChroma = RELATIVE_MINOR_CHROMA[i];
-    const minorPf = pf;  // moll používá stejnou stranu (#/b) jako nadřazený dur
+    const minorPf = pf;
     return {
       chroma,
       majorName: chromaToName(chroma, notation, pf),
@@ -217,13 +218,14 @@ function buildFretboard(tuningMidi, fretCount, notation, activeNotes, rootChroma
 
 // ─── Nashville ────────────────────────────────────────────────────────────────
 
-function getNashvilleChords(rootChroma, scaleKey, notation) {
+function getNashvilleChords(rootChroma, scaleKey, notation, useFlats = null) {
   const formula = SCALE_FORMULAS[scaleKey];
   if (!formula || formula.intervals.length < 7) return null;
   const intervals = formula.intervals;
   const qualities = NASHVILLE_QUALITIES[scaleKey];
   if (!qualities) return null;
 
+  const pf = useFlats !== null ? useFlats : prefersFlats(rootChroma);
   return intervals.map((semitones, i) => {
     const degreeChroma = (rootChroma + semitones) % 12;
     const quality = qualities[i];
@@ -234,26 +236,22 @@ function getNashvilleChords(rootChroma, scaleKey, notation) {
       : isDur
         ? ROMAN_UPPER[i]
         : ROMAN_LOWER[i];
-    const pf = prefersFlats(degreeChroma);
     const noteName = chromaToName(degreeChroma, notation, pf);
     return { numeral, noteName, quality, degreeChroma, semitones };
   });
 }
 
-function getDominantInfo(rootChroma, scaleKey, notation) {
-  const nashville = getNashvilleChords(rootChroma, scaleKey, notation);
+function getDominantInfo(rootChroma, scaleKey, notation, useFlats = null) {
+  const nashville = getNashvilleChords(rootChroma, scaleKey, notation, useFlats);
   if (!nashville) return null;
 
-  // Primární dominant = V (index 4)
   const dominant = nashville[4];
+  const pf = useFlats !== null ? useFlats : prefersFlats(rootChroma);
 
-  // Sekundární dominanty: V/ii, V/iii, V/IV, V/V, V/vi (ne V/I a ne V/vii°)
   const secDoms = nashville
     .filter((_, i) => i !== 0 && i !== 6)
     .map(target => {
-      // sekundární dominant k tomuto stupni = akord na čisté kvintě nad ním
       const domChroma = (target.degreeChroma + 7) % 12;
-      const pf = prefersFlats(domChroma);
       const domName = chromaToName(domChroma, notation, pf);
       return {
         label: `V/${target.numeral}`,

@@ -189,7 +189,7 @@ function renderAll() {
     const diatonicMajor = new Set();
     const diatonicMinor = new Set();
     if (state.mode === 'scale') {
-      const nash = Theory.getNashvilleChords(state.rootChroma, state.scaleKey, state.notation);
+      const nash = Theory.getNashvilleChords(state.rootChroma, state.scaleKey, state.notation, state.useFlats);
       if (nash) {
         nash.forEach(n => {
           if (n.quality === 'Dur')       diatonicMajor.add(n.degreeChroma);
@@ -202,7 +202,7 @@ function renderAll() {
       if (state.mode === 'scale') patch.scaleKey = isMajor ? 'Dur' : 'Moll';
       else                        patch.chordKey = isMajor ? 'Dur' : 'Moll';
       setState(patch);
-    }, diatonicMajor, diatonicMinor, rootIsMajor);
+    }, diatonicMajor, diatonicMinor, rootIsMajor, state.useFlats);
   }
 
   updateInfoPanel();
@@ -283,8 +283,8 @@ function updateNashville() {
   }
 
   // Stupnice
-  const nashville = Theory.getNashvilleChords(state.rootChroma, state.scaleKey, state.notation);
-  const domInfo   = Theory.getDominantInfo(state.rootChroma, state.scaleKey, state.notation);
+  const nashville = Theory.getNashvilleChords(state.rootChroma, state.scaleKey, state.notation, state.useFlats);
+  const domInfo   = Theory.getDominantInfo(state.rootChroma, state.scaleKey, state.notation, state.useFlats);
 
   if (!nashville) {
     // Pentatonika / bluesová — jen stupně
