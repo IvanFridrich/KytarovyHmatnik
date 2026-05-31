@@ -130,11 +130,14 @@ const LIVE_TRIGGERS = new Set([
 // Transponuje MIDI voicing tak, aby root byl v cílové oktávě
 function transposeToOctave(midiNotes, rootChroma, targetOctave) {
   if (!midiNotes.length) return midiNotes;
-  const rootMidi = midiNotes.find(m => Theory.midiToChroma(m) === rootChroma);
-  const baseMidi = rootMidi !== undefined ? rootMidi : midiNotes[0];
-  const currentOctave = Math.floor(baseMidi / 12) - 1;
-  const shift = (targetOctave - currentOctave) * 12;
-  return midiNotes.map(m => m + shift);
+  const rootMidi = (targetOctave + 1) * 12 + rootChroma;
+  return midiNotes.map(m => {
+    const chroma = Theory.midiToChroma(m);
+    let midi = (targetOctave + 1) * 12 + chroma;
+    while (midi < rootMidi) midi += 12;       // zarovnat na nebo nad root
+    while (midi - rootMidi >= 12) midi -= 12;  // udržet v rozsahu jedné oktávy
+    return midi;
+  });
 }
 
 function playLiveChord() {

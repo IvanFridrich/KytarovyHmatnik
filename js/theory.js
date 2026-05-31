@@ -169,7 +169,7 @@ function getCircleOfFifths(notation) {
   return COF_ORDER.map((chroma, i) => {
     const pf = FLAT_KEYS.has(chroma);
     const minorChroma = RELATIVE_MINOR_CHROMA[i];
-    const minorPf = FLAT_KEYS.has(minorChroma);
+    const minorPf = pf;  // moll používá stejnou stranu (#/b) jako nadřazený dur
     return {
       chroma,
       majorName: chromaToName(chroma, notation, pf),
