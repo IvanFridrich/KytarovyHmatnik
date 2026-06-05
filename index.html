@@ -19,7 +19,65 @@
   <!-- ─── Postranní panel ─────────────────────────────────────────────────── -->
   <aside class="sidebar">
 
-    <!-- Sekce 1: Základní nastavení -->
+    <!-- Sekce 1: Volba akordu / stupnice -->
+    <section class="card">
+      <h2>Akord / Stupnice</h2>
+
+      <div class="tab-toggle">
+        <button id="tab-chord">Akordy</button>
+        <button id="tab-scale">Stupnice</button>
+      </div>
+
+      <label>Základní tón</label>
+      <div id="root-picker"></div>
+
+      <!-- Panel akordů -->
+      <div id="chord-panel">
+        <label>Typ akordu</label>
+        <div class="btn-group-wrap" id="chord-type-group"></div>
+      </div>
+
+      <!-- Panel stupnic -->
+      <div id="scale-panel" hidden>
+        <label>Typ stupnice</label>
+        <div class="btn-group-wrap" id="scale-type-group"></div>
+      </div>
+    </section>
+
+    <!-- Sekce 2: Přehrávání -->
+    <section class="card">
+      <h2>Přehrávání</h2>
+      <button id="play-btn">▶ Přehrát akord</button>
+      <button id="stop-btn" style="margin-top: 4px;">⏹ Zastavit</button>
+
+      <label>Zvuk</label>
+      <div class="btn-group" id="timbre-group">
+        <button data-value="sine">Kytara</button>
+        <button data-value="organ">Varhany</button>
+      </div>
+
+      <label>Oktáva: <span id="play-octave-display">3</span></label>
+      <input type="range" id="play-octave" min="0" max="7" value="3" step="1">
+
+      <label>Hlasitost: <span id="volume-display">70</span>%</label>
+      <input type="range" id="volume-slider" min="0" max="100" value="70" step="5">
+
+      <label>Délka tónu</label>
+      <div class="btn-group" id="play-duration-group">
+        <button data-value="short">Krátce</button>
+        <button data-value="normal">Normálně</button>
+        <button data-value="long">Trvale</button>
+      </div>
+
+      <div class="check-row" style="margin-top: 10px;">
+        <input type="checkbox" id="live-play-check">
+        <label for="live-play-check" style="text-transform: none; letter-spacing: 0; font-size: 0.82rem; margin: 0; color: var(--text-primary);">
+          Živý náhled (hraje průběžně)
+        </label>
+      </div>
+    </section>
+
+    <!-- Sekce 3: Základní nastavení -->
     <section class="card">
       <h2>Nastavení nástroje</h2>
 
@@ -60,64 +118,6 @@
       <div class="btn-group" id="color-mode-group">
         <button data-value="interval">Interval</button>
         <button data-value="tone">Tón</button>
-      </div>
-    </section>
-
-    <!-- Sekce 2: Volba akordu / stupnice -->
-    <section class="card">
-      <h2>Akord / Stupnice</h2>
-
-      <div class="tab-toggle">
-        <button id="tab-chord">Akordy</button>
-        <button id="tab-scale">Stupnice</button>
-      </div>
-
-      <label>Základní tón</label>
-      <div id="root-picker"></div>
-
-      <!-- Panel akordů -->
-      <div id="chord-panel">
-        <label>Typ akordu</label>
-        <div class="btn-group-wrap" id="chord-type-group"></div>
-      </div>
-
-      <!-- Panel stupnic -->
-      <div id="scale-panel" hidden>
-        <label>Typ stupnice</label>
-        <div class="btn-group-wrap" id="scale-type-group"></div>
-      </div>
-    </section>
-
-    <!-- Sekce: Přehrávání -->
-    <section class="card">
-      <h2>Přehrávání</h2>
-      <button id="play-btn">▶ Přehrát akord</button>
-      <button id="stop-btn" style="margin-top: 4px;">⏹ Zastavit</button>
-
-      <label>Zvuk</label>
-      <div class="btn-group" id="timbre-group">
-        <button data-value="sine">Kytara</button>
-        <button data-value="organ">Varhany</button>
-      </div>
-
-      <label>Oktáva: <span id="play-octave-display">3</span></label>
-      <input type="range" id="play-octave" min="0" max="7" value="3" step="1">
-
-      <label>Hlasitost: <span id="volume-display">70</span>%</label>
-      <input type="range" id="volume-slider" min="0" max="100" value="70" step="5">
-
-      <label>Délka tónu</label>
-      <div class="btn-group" id="play-duration-group">
-        <button data-value="short">Krátce</button>
-        <button data-value="normal">Normálně</button>
-        <button data-value="long">Trvale</button>
-      </div>
-
-      <div class="check-row" style="margin-top: 10px;">
-        <input type="checkbox" id="live-play-check">
-        <label for="live-play-check" style="text-transform: none; letter-spacing: 0; font-size: 0.82rem; margin: 0; color: var(--text-primary);">
-          Živý náhled (hraje průběžně)
-        </label>
       </div>
     </section>
 
