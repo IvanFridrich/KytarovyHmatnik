@@ -173,9 +173,6 @@ li { font-size: 0.88rem; padding: 3px 0; }
     "header  header"
     "sidebar main-column";
   min-height: 100vh;
-  max-width: 1600px;
-  margin-left: auto;
-  margin-right: auto;
 }
 
 .main-column {
@@ -609,7 +606,7 @@ input[type="range"] {
 }
 
 @media (min-width: 1400px) {
-  .app-layout { grid-template-columns: 440px 1fr; }
+  .app-layout { grid-template-columns: clamp(440px, 22vw, 600px) 1fr; }
   #cof-svg { width: 300px; height: 300px; }
 }
 
