@@ -213,11 +213,6 @@ function composeUndo() {
   setState({ bassLine: { ...state.bassLine, events: state.bassLine.events.slice(0, -1) } });
 }
 
-function composeClear() {
-  if (!state.bassLine.events.length) return;
-  setState({ bassLine: { ...state.bassLine, events: [] } });
-}
-
 // ─── Export do MusicXML (MuseScore) ───────────────────────────────────────────
 
 function buildMusicXML(bassLine) {
@@ -604,7 +599,7 @@ function syncControls() {
   }
 
   const emptyLine = state.bassLine.events.length === 0;
-  ['compose-undo','compose-clear','compose-play','compose-export'].forEach(id => {
+  ['compose-undo','compose-play','compose-export'].forEach(id => {
     const b = document.getElementById(id);
     if (b) b.disabled = !hasKey || emptyLine;
   });
@@ -944,7 +939,6 @@ function bindEvents() {
 
   document.getElementById('compose-rest')?.addEventListener('click', addComposeRest);
   document.getElementById('compose-undo')?.addEventListener('click', composeUndo);
-  document.getElementById('compose-clear')?.addEventListener('click', composeClear);
 
   document.getElementById('compose-tempo')?.addEventListener('input', e => {
     const tempo = +e.target.value;
