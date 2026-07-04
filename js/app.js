@@ -24,12 +24,17 @@ const defaultState = {
   playDuration:  'normal',    // 'short' | 'normal' | 'long'
   livePlay:      false,       // živý náhled — akord hraje průběžně
   volume:        70,          // hlasitost 0–100
+  composeMode:   false,       // režim skládání basové linky
+  currentDur:    'quarter',   // aktuálně zvolená délka pro nové noty
+  currentDot:    false,       // tečka u nově přidávaných not
+  bassLine:      { tempo: 90, keySig: null, events: [] },  // skládaná linka (keySig = fifths, null = nezvoleno)
 };
 
 const PERSISTED_KEYS = [
   'theme','instrument','tuningKey','customTuning','notation','accidentals',
   'fretCount','mode','rootChroma','chordKey','scaleKey','nonLinearFrets','timbre',
   'colorMode','playOctave','playDuration','livePlay','volume',
+  'composeMode','currentDur','currentDot','bassLine',
 ];
 
 // ─── Stav aplikace ────────────────────────────────────────────────────────────
@@ -63,6 +68,13 @@ function loadState() {
     // Migrace starých klíčů (před přejmenováním '7'→'dom7', '6'→'maj6')
     if (state.chordKey === '7') state.chordKey = 'dom7';
     if (state.chordKey === '6') state.chordKey = 'maj6';
+    // Sanity: bassLine musí mít pole events a tempo
+    if (!state.bassLine || typeof state.bassLine !== 'object' || !Array.isArray(state.bassLine.events)) {
+      state.bassLine = { tempo: 90, keySig: null, events: [] };
+    }
+    if (!state.bassLine.tempo) state.bassLine.tempo = 90;
+    if (state.bassLine.keySig === undefined) state.bassLine.keySig = null;
+    if (!Theory.DURATIONS || !Theory.DURATIONS[state.currentDur]) state.currentDur = 'quarter';
   } catch (_) {}
 }
 
@@ -167,6 +179,143 @@ function setState(patch) {
   }
 }
 
+// ─── Skládání basové linky ────────────────────────────────────────────────────
+
+// Délka noty v sekundách pro aktuální tempo (na zvukovou zpětnou vazbu i přehrání)
+function durSeconds(durName, tempo) {
+  const div = Theory.DURATIONS[durName] ? Theory.DURATIONS[durName].div : 4;
+  return div * (60 / (tempo || 90) / 4);
+}
+
+function keySigChosen() {
+  return state.bassLine.keySig !== null && state.bassLine.keySig !== undefined;
+}
+
+// Klik na hmatník v režimu skládání: přidá notu zvolené délky a zahraje ji
+function addComposeNote(midi) {
+  if (!keySigChosen()) return;   // nejdřív předznamenání
+  const dot = state.currentDot && state.currentDur !== 'sixteenth';
+  const events = [...state.bassLine.events, { kind: 'note', midi, dur: state.currentDur, dot }];
+  const secs = Math.max(0.15, Math.min(1.5, durSeconds(state.currentDur, state.bassLine.tempo) * (dot ? 1.5 : 1)));
+  Audio.playNote(midi, state.timbre, secs);
+  setState({ bassLine: { ...state.bassLine, events } });
+}
+
+function addComposeRest() {
+  if (!keySigChosen()) return;
+  const dot = state.currentDot && state.currentDur !== 'sixteenth';
+  const events = [...state.bassLine.events, { kind: 'rest', dur: state.currentDur, dot }];
+  setState({ bassLine: { ...state.bassLine, events } });
+}
+
+function composeUndo() {
+  if (!state.bassLine.events.length) return;
+  setState({ bassLine: { ...state.bassLine, events: state.bassLine.events.slice(0, -1) } });
+}
+
+function composeClear() {
+  if (!state.bassLine.events.length) return;
+  setState({ bassLine: { ...state.bassLine, events: [] } });
+}
+
+// ─── Export do MusicXML (MuseScore) ───────────────────────────────────────────
+
+function buildMusicXML(bassLine) {
+  const measures = Theory.fitToMeasures(bassLine.events);
+  const tempo  = bassLine.tempo || 90;
+  const fifths = bassLine.keySig || 0;
+  let body = '';
+
+  measures.forEach((measure, mi) => {
+    let notesXml = '';
+    measure.forEach(piece => {
+      const type = Theory.DURATIONS[piece.dur].xml;
+      const dur  = piece.div;
+      const dotXml = piece.dot ? `\n        <dot/>` : '';
+      if (piece.kind === 'rest') {
+        notesXml +=
+`      <note>
+        <rest/>
+        <duration>${dur}</duration>
+        <type>${type}</type>${dotXml}
+      </note>
+`;
+      } else {
+        const p = Theory.midiToNotated(piece.midi, fifths);
+        const alterXml = p.alter ? `\n          <alter>${p.alter}</alter>` : '';
+        const accXml   = p.accidental ? `\n        <accidental>${p.accidental}</accidental>` : '';
+        let tieXml = '';
+        if (piece.tieStop)  tieXml += `\n        <tie type="stop"/>`;
+        if (piece.tieStart) tieXml += `\n        <tie type="start"/>`;
+        let tiedXml = '';
+        if (piece.tieStart || piece.tieStop) {
+          const inner = [
+            piece.tieStop  ? '          <tied type="stop"/>'  : '',
+            piece.tieStart ? '          <tied type="start"/>' : '',
+          ].filter(Boolean).join('\n');
+          tiedXml = `\n        <notations>\n${inner}\n        </notations>`;
+        }
+        notesXml +=
+`      <note>
+        <pitch>
+          <step>${p.step}</step>${alterXml}
+          <octave>${p.octave}</octave>
+        </pitch>
+        <duration>${dur}</duration>${tieXml}
+        <type>${type}</type>${dotXml}${accXml}${tiedXml}
+      </note>
+`;
+      }
+    });
+
+    const attrs = mi === 0
+      ?
+`      <attributes>
+        <divisions>4</divisions>
+        <key><fifths>${fifths}</fifths></key>
+        <time><beats>4</beats><beat-type>4</beat-type></time>
+        <clef><sign>F</sign><line>4</line></clef>
+      </attributes>
+      <direction placement="above">
+        <direction-type>
+          <metronome><beat-unit>quarter</beat-unit><per-minute>${tempo}</per-minute></metronome>
+        </direction-type>
+        <sound tempo="${tempo}"/>
+      </direction>
+`
+      : '';
+
+    body += `    <measure number="${mi + 1}">\n${attrs}${notesXml}    </measure>\n`;
+  });
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
+<score-partwise version="4.0">
+  <part-list>
+    <score-part id="P1">
+      <part-name>Bass</part-name>
+    </score-part>
+  </part-list>
+  <part id="P1">
+${body}  </part>
+</score-partwise>
+`;
+}
+
+function downloadMusicXML() {
+  if (!state.bassLine.events.length || !keySigChosen()) return;
+  const xml  = buildMusicXML(state.bassLine);
+  const blob = new Blob([xml], { type: 'application/vnd.recordare.musicxml+xml' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url;
+  a.download = 'basova-linka.musicxml';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 // ─── Render ───────────────────────────────────────────────────────────────────
 
 function renderAll() {
@@ -175,7 +324,8 @@ function renderAll() {
 
   if (fbSvg) {
     Render.renderFretboard(fbSvg, state, (midi) => {
-      Audio.playNote(midi, state.timbre);
+      if (state.composeMode) addComposeNote(midi);
+      else                   Audio.playNote(midi, state.timbre);
     });
   }
 
@@ -207,6 +357,12 @@ function renderAll() {
 
   updateInfoPanel();
   syncControls();
+
+  // Notová osnova basové linky — až po syncControls (panel je odkrytý, clientWidth platné)
+  const notationEl = document.getElementById('notation');
+  if (notationEl && state.composeMode) {
+    Render.renderNotation(notationEl, state.bassLine.events, state.bassLine.keySig);
+  }
 }
 
 // ─── Info panel ───────────────────────────────────────────────────────────────
@@ -412,6 +568,46 @@ function syncControls() {
   // Tlačítko přehrát
   const playBtn = document.getElementById('play-btn');
   if (playBtn) playBtn.textContent = state.mode === 'chord' ? '▶ Přehrát akord' : '▶ Přehrát stupnici';
+
+  // ─── Panel skladby ───
+  const composeToggle = document.getElementById('compose-toggle');
+  if (composeToggle) composeToggle.classList.toggle('active', state.composeMode);
+  const composeBody = document.getElementById('compose-body');
+  if (composeBody) composeBody.hidden = !state.composeMode;
+
+  const hasKey = keySigChosen();
+
+  // Předznamenání — hodnota selectu a zvýraznění „nutno vybrat"
+  const keySel = document.getElementById('key-sig-select');
+  if (keySel) keySel.value = hasKey ? String(state.bassLine.keySig) : '';
+  const keyRow = document.getElementById('compose-keysig');
+  if (keyRow) keyRow.classList.toggle('needs-choice', !hasKey);
+
+  setActiveBtn('compose-dur-group', state.currentDur);
+
+  const tempoSlider  = document.getElementById('compose-tempo');
+  const tempoDisplay = document.getElementById('compose-tempo-display');
+  if (tempoSlider) { tempoSlider.value = state.bassLine.tempo; tempoSlider.disabled = !hasKey; }
+  if (tempoDisplay) tempoDisplay.textContent = state.bassLine.tempo;
+
+  // Dokud není zvoleno předznamenání, zakázat délky, pomlku i celý zbytek
+  document.querySelectorAll('#compose-dur-group button').forEach(b => { b.disabled = !hasKey; });
+  const restBtn = document.getElementById('compose-rest');
+  if (restBtn) restBtn.disabled = !hasKey;
+
+  // Tečka — aktivní stav a zákaz u šestnáctinové / bez tóniny
+  const dotBtn = document.getElementById('compose-dot');
+  if (dotBtn) {
+    const dotOn = state.currentDot && state.currentDur !== 'sixteenth';
+    dotBtn.classList.toggle('active', dotOn);
+    dotBtn.disabled = !hasKey || state.currentDur === 'sixteenth';
+  }
+
+  const emptyLine = state.bassLine.events.length === 0;
+  ['compose-undo','compose-clear','compose-play','compose-export'].forEach(id => {
+    const b = document.getElementById(id);
+    if (b) b.disabled = !hasKey || emptyLine;
+  });
 }
 
 // Nastaví active class na tlačítka skupiny dle data-value
@@ -560,6 +756,36 @@ function buildScaleTypeGroup() {
   }
 }
 
+function buildComposeDurGroup() {
+  const group = document.getElementById('compose-dur-group');
+  if (!group) return;
+  group.innerHTML = '';
+  for (const [key, val] of Object.entries(Theory.DURATIONS)) {
+    const btn = document.createElement('button');
+    btn.dataset.value = key;
+    btn.textContent = val.glyph;
+    btn.title = val.label;
+    btn.className = key === state.currentDur ? 'active' : '';
+    group.appendChild(btn);
+  }
+}
+
+function buildKeySigSelect() {
+  const sel = document.getElementById('key-sig-select');
+  if (!sel) return;
+  sel.innerHTML = '';
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = '— vyber předznamenání —';
+  sel.appendChild(placeholder);
+  for (const k of Theory.KEY_SIGNATURES) {
+    const opt = document.createElement('option');
+    opt.value = String(k.fifths);
+    opt.textContent = k.label;
+    sel.appendChild(opt);
+  }
+}
+
 // ─── Event binding ────────────────────────────────────────────────────────────
 
 function bindEvents() {
@@ -696,6 +922,43 @@ function bindEvents() {
   });
 
 
+  // ─── Panel skladby ───
+  document.getElementById('compose-toggle')?.addEventListener('click', () => {
+    setState({ composeMode: !state.composeMode });
+  });
+
+  document.getElementById('key-sig-select')?.addEventListener('change', e => {
+    const v = e.target.value;
+    setState({ bassLine: { ...state.bassLine, keySig: v === '' ? null : +v } });
+  });
+
+  document.getElementById('compose-dur-group')?.addEventListener('click', e => {
+    const val = e.target.dataset.value;
+    if (val) setState({ currentDur: val, ...(val === 'sixteenth' ? { currentDot: false } : {}) });
+  });
+
+  document.getElementById('compose-dot')?.addEventListener('click', () => {
+    if (state.currentDur === 'sixteenth') return;
+    setState({ currentDot: !state.currentDot });
+  });
+
+  document.getElementById('compose-rest')?.addEventListener('click', addComposeRest);
+  document.getElementById('compose-undo')?.addEventListener('click', composeUndo);
+  document.getElementById('compose-clear')?.addEventListener('click', composeClear);
+
+  document.getElementById('compose-tempo')?.addEventListener('input', e => {
+    const tempo = +e.target.value;
+    const display = document.getElementById('compose-tempo-display');
+    if (display) display.textContent = tempo;
+    setState({ bassLine: { ...state.bassLine, tempo } });
+  });
+
+  document.getElementById('compose-play')?.addEventListener('click', () => {
+    Audio.playSequence(state.bassLine.events, state.bassLine.tempo, state.timbre);
+  });
+  document.getElementById('compose-stop')?.addEventListener('click', () => Audio.stopAll());
+  document.getElementById('compose-export')?.addEventListener('click', downloadMusicXML);
+
   // System theme change
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
     if (state.theme === 'auto') {
@@ -716,6 +979,8 @@ function init() {
   buildRootPicker();
   buildChordTypeGroup();
   buildScaleTypeGroup();
+  buildComposeDurGroup();
+  buildKeySigSelect();
 
   bindEvents();
   recompute();

@@ -101,6 +101,24 @@ function playScale(midiNotes, timbre, noteDuration = 1.0) {
   midiNotes.forEach((midi, i) => playNote(midi, timbre, noteDuration, i * step));
 }
 
+// Přehraje basovou linku — sekvence {kind,midi?,dur} v daném tempu (BPM)
+function playSequence(events, tempo = 90, timbre = 'sine') {
+  stopAll();
+  const secPerDiv = 60 / (tempo || 90) / 4;   // 4 divisions = čtvrťová = 60/tempo s
+  let delay = 0;
+  for (const ev of events) {
+    const info = Theory.DURATIONS[ev.dur];
+    if (!info) continue;
+    const div = ev.dot && Number.isInteger(info.div * 1.5) ? info.div * 1.5 : info.div;
+    const durSec = div * secPerDiv;
+    if (ev.kind === 'note' && ev.midi != null) {
+      // znít o něco kratší než plná délka, ať jsou tóny slyšitelně oddělené
+      playNote(ev.midi, timbre, Math.max(0.12, durSec * 0.92), delay);
+    }
+    delay += durSec;
+  }
+}
+
 // Trvale znějící akord — bez útlumu, zastaví stopAll()
 function playSustained(midiNotes, timbre) {
   stopAll();
@@ -146,6 +164,7 @@ const Audio = {
   playNote,
   playChord,
   playScale,
+  playSequence,
   playSustained,
   stopAll,
   isPlaying,

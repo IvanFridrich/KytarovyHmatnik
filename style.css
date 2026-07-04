@@ -180,7 +180,8 @@ li { font-size: 0.88rem; padding: 3px 0; }
   display: flex;
   flex-direction: column;
   min-height: 0;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .app-header {
@@ -560,6 +561,151 @@ input[type="range"] {
   height: 12px;
   border-radius: 50%;
   flex-shrink: 0;
+}
+
+/* ─── Panel skládání basové linky ─────────────────────────────────────────── */
+.compose-panel {
+  flex-shrink: 0;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border);
+  padding: 12px 16px;
+}
+
+.compose-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+#compose-toggle {
+  background: var(--btn-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 7px 14px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-family: var(--font);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition), border-color var(--transition);
+}
+#compose-toggle:hover { background: var(--btn-hover); }
+#compose-toggle.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.compose-hint { font-size: 0.75rem; color: var(--text-secondary); }
+
+#compose-body { margin-top: 12px; }
+
+.compose-keysig {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+}
+.compose-keysig label {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+}
+.compose-keysig .req { color: var(--accent); }
+.compose-keysig select {
+  width: auto;
+  min-width: 240px;
+  flex: 0 1 auto;
+}
+/* Zvýraznění, dokud není zvoleno předznamenání */
+.compose-keysig.needs-choice {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+.compose-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.compose-group { display: flex; align-items: center; gap: 6px; }
+
+.compose-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.compose-group > button {
+  background: var(--btn-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  font-family: var(--font);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background var(--transition);
+  white-space: nowrap;
+}
+.compose-group > button:hover { background: var(--btn-hover); }
+.compose-group > button.active {
+  background: var(--btn-active-bg);
+  color: var(--btn-active-text);
+  border-color: var(--btn-active-bg);
+  font-weight: 600;
+}
+
+#compose-dur-group button {
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 5px 11px;
+}
+
+.compose-primary {
+  background: var(--accent) !important;
+  color: #fff !important;
+  border-color: var(--accent) !important;
+}
+.compose-primary:hover { background: var(--accent-hover) !important; }
+
+.compose-panel button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+#compose-tempo { width: 130px; }
+
+/* Notová osnova — světlý „papír" pro čitelnost v obou tématech */
+.notation {
+  background: #fbfbf7;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 8px;
+  overflow: auto;
+  max-height: 340px;
+}
+.notation svg { display: block; }
+.notation-empty {
+  color: #888;
+  font-size: 0.85rem;
+  text-align: center;
+  padding: 20px;
 }
 
 /* ─── Responzivní ─────────────────────────────────────────────────────────── */

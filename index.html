@@ -131,6 +131,50 @@
     <svg id="fretboard-svg" xmlns="http://www.w3.org/2000/svg" aria-label="Kytarový hmatník"></svg>
   </main>
 
+  <!-- ─── Panel skládání basové linky ─────────────────────────────────────── -->
+  <section class="compose-panel">
+    <div class="compose-head">
+      <button id="compose-toggle" title="Zapnout/vypnout skládání — klik na hmatník přidá notu">
+        🎵 Režim skládání
+      </button>
+      <span class="compose-hint">V režimu skládání klik na notu v hmatníku ji přidá do osnovy.</span>
+    </div>
+
+    <div id="compose-body" hidden>
+      <div class="compose-keysig" id="compose-keysig">
+        <label for="key-sig-select">Předznamenání <span class="req">(vyber první)</span></label>
+        <select id="key-sig-select"></select>
+      </div>
+
+      <div class="compose-toolbar">
+        <div class="compose-group">
+          <span class="compose-label">Délka</span>
+          <div class="btn-group" id="compose-dur-group"></div>
+          <button id="compose-dot" title="Tečka — prodlouží notu o polovinu">• Tečka</button>
+          <button id="compose-rest" title="Přidat pomlku zvolené délky">𝄽 Pomlka</button>
+        </div>
+
+        <div class="compose-group">
+          <button id="compose-undo" title="Smazat poslední">↶ Zpět</button>
+          <button id="compose-clear" title="Smazat celou linku">🗑 Vymazat</button>
+        </div>
+
+        <div class="compose-group">
+          <span class="compose-label">Tempo: <span id="compose-tempo-display">90</span></span>
+          <input type="range" id="compose-tempo" min="40" max="220" value="90" step="1">
+        </div>
+
+        <div class="compose-group">
+          <button id="compose-play" class="compose-primary" title="Přehrát linku">▶ Přehrát</button>
+          <button id="compose-stop" title="Zastavit">⏹ Stop</button>
+          <button id="compose-export" class="compose-primary" title="Stáhnout jako MusicXML pro MuseScore">⬇ Export MusicXML</button>
+        </div>
+      </div>
+
+      <div id="notation" class="notation"></div>
+    </div>
+  </section>
+
   <!-- ─── Info panel ──────────────────────────────────────────────────────── -->
   <div class="info-panel">
 
@@ -170,6 +214,7 @@
 <!-- Tooltip overlay -->
 <div id="tooltip" hidden></div>
 
+<script src="js/vendor/vexflow.js" defer></script>
 <script src="js/theory.js" defer></script>
 <script src="js/render.js" defer></script>
 <script src="js/audio.js" defer></script>

@@ -297,6 +297,145 @@ function selectVoicingMidi(fretboard, activeNotes, minFret = 0) {
   return [...found.values()];
 }
 
+// ─── Basová linka: délky, výška, dělení do taktů ──────────────────────────────
+
+// div = počet šestnáctin (divisions=4 na čtvrťovou); xml = MusicXML <type>; vf = VexFlow kód
+const DURATIONS = {
+  whole:     { div: 16, xml: 'whole',   vf: 'w',  glyph: '𝅝',  label: 'celá' },
+  half:      { div: 8,  xml: 'half',    vf: 'h',  glyph: '𝅗𝅥',  label: 'půlová' },
+  quarter:   { div: 4,  xml: 'quarter', vf: 'q',  glyph: '♩',  label: 'čtvrťová' },
+  eighth:    { div: 2,  xml: 'eighth',  vf: '8',  glyph: '♪',  label: 'osminová' },
+  sixteenth: { div: 1,  xml: '16th',    vf: '16', glyph: '𝅘𝅥𝅯',  label: 'šestnáctinová' },
+};
+
+const MEASURE_DIV = 16;  // 4/4
+
+// Spelling chroma → notová hlava (step + alter), sdíleno osnovou i MusicXML.
+// Křížky: C C# D D# E F F# G G# A A# B; Béčka: C Db D Eb E F Gb G Ab A Bb B
+const SHARP_SPELL = [['C',0],['C',1],['D',0],['D',1],['E',0],['F',0],['F',1],['G',0],['G',1],['A',0],['A',1],['B',0]];
+const FLAT_SPELL  = [['C',0],['D',-1],['D',0],['E',-1],['E',0],['F',0],['G',-1],['G',0],['A',-1],['A',0],['B',-1],['B',0]];
+
+// midi → { step:'G', alter:-1|0|1, octave } (žádné Cb/H#, takže oktáva z floor je vždy správná)
+function midiToPitch(midi, useFlats) {
+  const chroma = midiToChroma(midi);
+  const [step, alter] = (useFlats ? FLAT_SPELL : SHARP_SPELL)[chroma];
+  return { step, alter, octave: Math.floor(midi / 12) - 1 };
+}
+
+// ─── Předznamenání (klíčové posuvky) ──────────────────────────────────────────
+
+// fifths dle MusicXML: kladné = křížky, záporné = béčka. vfKey = VexFlow durový klíč.
+const KEY_SIGNATURES = [
+  { fifths: -7, label: 'Ces dur / as moll (7 ♭)', vfKey: 'Cb' },
+  { fifths: -6, label: 'Ges dur / es moll (6 ♭)', vfKey: 'Gb' },
+  { fifths: -5, label: 'Des dur / b moll (5 ♭)',  vfKey: 'Db' },
+  { fifths: -4, label: 'As dur / f moll (4 ♭)',   vfKey: 'Ab' },
+  { fifths: -3, label: 'Es dur / c moll (3 ♭)',   vfKey: 'Eb' },
+  { fifths: -2, label: 'B dur / g moll (2 ♭)',    vfKey: 'Bb' },
+  { fifths: -1, label: 'F dur / d moll (1 ♭)',    vfKey: 'F'  },
+  { fifths:  0, label: 'C dur / a moll (bez předznamenání)', vfKey: 'C' },
+  { fifths:  1, label: 'G dur / e moll (1 ♯)',    vfKey: 'G'  },
+  { fifths:  2, label: 'D dur / h moll (2 ♯)',    vfKey: 'D'  },
+  { fifths:  3, label: 'A dur / fis moll (3 ♯)',  vfKey: 'A'  },
+  { fifths:  4, label: 'E dur / cis moll (4 ♯)',  vfKey: 'E'  },
+  { fifths:  5, label: 'H dur / gis moll (5 ♯)',  vfKey: 'B'  },
+  { fifths:  6, label: 'Fis dur / dis moll (6 ♯)',vfKey: 'F#' },
+  { fifths:  7, label: 'Cis dur / ais moll (7 ♯)',vfKey: 'C#' },
+];
+
+const SHARP_ORDER = ['F','C','G','D','A','E','B'];  // pořadí křížků
+const FLAT_ORDER  = ['B','E','A','D','G','C','F'];  // pořadí béček
+
+// Alterace, kterou předznamenání dává danému písmenu (0 / +1 / -1)
+function keySigAlter(step, fifths) {
+  if (fifths > 0) return SHARP_ORDER.slice(0, fifths).includes(step) ? 1 : 0;
+  if (fifths < 0) return FLAT_ORDER.slice(0, -fifths).includes(step) ? -1 : 0;
+  return 0;
+}
+
+// midi + předznamenání → { step, alter, octave, accidental }
+// accidental = zobrazená posuvka ('sharp'|'flat'|'natural') POUZE když se liší od předznamenání
+function midiToNotated(midi, fifths) {
+  const useFlats = fifths < 0;
+  const chroma = midiToChroma(midi);
+  const [step, alter] = (useFlats ? FLAT_SPELL : SHARP_SPELL)[chroma];
+  const octave = Math.floor(midi / 12) - 1;
+  const sig = keySigAlter(step, fifths);
+  let accidental = null;
+  if (alter !== sig) accidental = alter === 1 ? 'sharp' : alter === -1 ? 'flat' : 'natural';
+  return { step, alter, octave, accidental };
+}
+
+// Rozloží počet šestnáctin na platné délky (mocniny 2), hladově od největší.
+function decomposeDuration(n) {
+  const out = [];
+  for (const name of ['whole','half','quarter','eighth','sixteenth']) {
+    const d = DURATIONS[name].div;
+    while (n >= d) { out.push({ dur: name, div: d }); n -= d; }
+  }
+  return out;
+}
+
+// Ploché události {kind,midi?,dur} → pole taktů (4/4). Noty přes taktovou čáru se
+// rozříznou a části se sváží ligaturou (tieStart/tieStop). Poslední takt se doplní pomlkou.
+function fitToMeasures(events) {
+  const flat = [];
+  let filled = 0;
+
+  for (const ev of events) {
+    const base = DURATIONS[ev.dur] ? DURATIONS[ev.dur].div : 0;
+    if (!base) continue;
+    // Tečka = 1,5×; povolena jen pokud vyjde celé číslo (tj. ne u šestnáctinové)
+    const dot   = !!ev.dot && Number.isInteger(base * 1.5);
+    const evDiv = dot ? base * 1.5 : base;
+    const startIdx = flat.length;
+
+    if (evDiv <= MEASURE_DIV - filled) {
+      // Vejde se celá → jeden zápis (zachová tečku)
+      flat.push({ kind: ev.kind, midi: ev.midi, dur: ev.dur, dot, div: evDiv, tieStart: false, tieStop: false });
+      filled += evDiv;
+      if (filled >= MEASURE_DIV) filled = 0;
+    } else {
+      // Přesah přes taktovou čáru → rozklad na základní délky, svázat ligaturou
+      let remaining = evDiv;
+      while (remaining > 0) {
+        const take = Math.min(MEASURE_DIV - filled, remaining);
+        for (const p of decomposeDuration(take)) {
+          flat.push({ kind: ev.kind, midi: ev.midi, dur: p.dur, dot: false, div: p.div, tieStart: false, tieStop: false });
+          filled += p.div;
+        }
+        remaining -= take;
+        if (filled >= MEASURE_DIV) filled = 0;  // taktová čára
+      }
+    }
+
+    // Sváž všechny části jedné noty (rozklad / přechod přes takt)
+    if (ev.kind === 'note') {
+      for (let k = startIdx; k < flat.length - 1; k++) {
+        flat[k].tieStart = true;
+        flat[k + 1].tieStop = true;
+      }
+    }
+  }
+
+  // Rozděl ploché části do taktů po 16 (přesně tvarované už z pass 1)
+  const measures = [];
+  let cur = [];
+  let f = 0;
+  for (const piece of flat) {
+    cur.push(piece);
+    f += piece.div;
+    if (f >= MEASURE_DIV) { measures.push(cur); cur = []; f = 0; }
+  }
+  if (cur.length) {
+    for (const p of decomposeDuration(MEASURE_DIV - f)) {
+      cur.push({ kind: 'rest', midi: undefined, dur: p.dur, dot: false, div: p.div, tieStart: false, tieStop: false });
+    }
+    measures.push(cur);
+  }
+  return measures;
+}
+
 // ─── Export ───────────────────────────────────────────────────────────────────
 
 const Theory = {
@@ -323,4 +462,12 @@ const Theory = {
   getNashvilleChords,
   getDominantInfo,
   selectVoicingMidi,
+  DURATIONS,
+  MEASURE_DIV,
+  midiToPitch,
+  decomposeDuration,
+  fitToMeasures,
+  KEY_SIGNATURES,
+  keySigAlter,
+  midiToNotated,
 };

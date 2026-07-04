@@ -412,8 +412,122 @@ function renderIntervalLegend(container, activeIntervals) {
   }
 }
 
+// ─── Notová osnova basové linky (VexFlow) ─────────────────────────────────────
+
+function renderNotation(container, events, fifths) {
+  container.innerHTML = '';
+
+  if (typeof Vex === 'undefined' || !Vex.Flow) {
+    container.innerHTML = '<p class="notation-empty">Notový zápis se nepodařilo načíst (VexFlow).</p>';
+    return;
+  }
+  if (fifths === null || fifths === undefined) {
+    container.innerHTML = '<p class="notation-empty">Nejdřív vyber předznamenání.</p>';
+    return;
+  }
+  if (!events || !events.length) {
+    container.innerHTML = '<p class="notation-empty">Zatím prázdné — vyber délku a klikni na noty v hmatníku.</p>';
+    return;
+  }
+
+  const VF = Vex.Flow;
+  const sig   = Theory.KEY_SIGNATURES.find(k => k.fifths === fifths) || { vfKey: 'C' };
+  const vfKey = sig.vfKey;
+  const measures = Theory.fitToMeasures(events);
+
+  const containerW = Math.max(320, container.clientWidth || 800);
+  const PAD = 10;
+  const ROW_H = 130;
+
+  // První takt navíc na klíč + taktové označení + předznamenání
+  const firstExtra = 70 + Math.abs(fifths) * 12;
+  const mWidths = measures.map((m, i) =>
+    Math.min(360, Math.max(150, 70 + m.length * 34)) + (i === 0 ? firstExtra : 0));
+
+  // Rozvržení do řádků (zalamování)
+  let x = PAD, y = PAD;
+  const pos = [];
+  for (let i = 0; i < measures.length; i++) {
+    if (x + mWidths[i] > containerW - PAD && x > PAD) { x = PAD; y += ROW_H; }
+    pos.push({ x, y, w: mWidths[i] });
+    x += mWidths[i];
+  }
+  const totalH = y + ROW_H;
+
+  let renderer, context;
+  try {
+    renderer = new VF.Renderer(container, VF.Renderer.Backends.SVG);
+    renderer.resize(containerW, totalH);
+    context = renderer.getContext();
+  } catch (err) {
+    container.innerHTML = '<p class="notation-empty">Chyba vykreslení osnovy.</p>';
+    return;
+  }
+
+  // Pass 1: sestavit osnovy, noty, hlasy, ligatury
+  const built = [];
+  const allVoices = [];
+  measures.forEach((measure, mi) => {
+    const p = pos[mi];
+    const stave = new VF.Stave(p.x, p.y, p.w);
+    if (mi === 0) stave.addClef('bass').addTimeSignature('4/4').addKeySignature(vfKey);
+
+    const notes = measure.map(piece => {
+      const vfBase = Theory.DURATIONS[piece.dur].vf;
+      const dotStr = piece.dot ? 'd' : '';
+      if (piece.kind === 'rest') {
+        return new VF.StaveNote({ clef: 'bass', keys: ['d/3'], duration: vfBase + dotStr + 'r' });
+      }
+      const n = Theory.midiToNotated(piece.midi, fifths);
+      const suffix = n.alter === 1 ? '#' : n.alter === -1 ? 'b' : '';
+      const key = n.step.toLowerCase() + suffix + '/' + n.octave;
+      return new VF.StaveNote({ clef: 'bass', keys: [key], duration: vfBase + dotStr });
+    });
+
+    // Vykreslit augmentační tečky (duration 'd' řeší doby, tohle glyph)
+    const dotted = notes.filter((_, idx) => measure[idx].dot);
+    if (dotted.length) { try { VF.Dot.buildAndAttach(dotted, { all: true }); } catch (err) {} }
+
+    // Ligatury uvnitř taktu (přechod přes taktovou čáru se vizuálně vynechá)
+    const ties = [];
+    for (let j = 0; j < measure.length - 1; j++) {
+      if (measure[j].kind === 'note' && measure[j].tieStart && measure[j + 1].tieStop) {
+        ties.push(new VF.StaveTie({
+          first_note: notes[j], last_note: notes[j + 1],
+          first_indices: [0], last_indices: [0],
+        }));
+      }
+    }
+
+    const voice = new VF.Voice({ num_beats: 4, beat_value: 4 }).setStrict(false);
+    voice.addTickables(notes);
+    allVoices.push(voice);
+    built.push({ stave, notes, voice, ties, isFirst: mi === 0 });
+  });
+
+  // Posuvky automaticky dle předznamenání (odrážky pro noty mimo tóninu,
+  // potlačení opakovaných posuvek v rámci taktu). Musí být PŘED formátováním.
+  try { VF.Accidental.applyAccidentals(allVoices, vfKey); } catch (err) {}
+
+  // Pass 2: formátovat + vykreslit
+  built.forEach(b => {
+    b.stave.setContext(context).draw();
+    try {
+      const beams = VF.Beam.generateBeams(b.notes);
+      const inset = b.isFirst ? firstExtra + 20 : 25;
+      new VF.Formatter().joinVoices([b.voice]).format([b.voice], b.stave.getWidth() - inset);
+      b.voice.draw(context, b.stave);
+      beams.forEach(bm => bm.setContext(context).draw());
+      b.ties.forEach(t => t.setContext(context).draw());
+    } catch (err) {
+      /* jednotlivý takt se nevykreslil — pokračuj dál */
+    }
+  });
+}
+
 const Render = {
   renderFretboard,
   renderCircleOfFifths,
   renderIntervalLegend,
+  renderNotation,
 };
