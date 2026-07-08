@@ -210,6 +210,19 @@ function renderFretboard(svgEl_, state, onNoteClick) {
       }
       g.appendChild(circle);
 
+      // Lem pentatonického boxu — barevný kroužek okolo noty (tón na švu má dva)
+      const boxIdxs = state.boxHighlight && state.boxHighlight.get(s + ':' + f);
+      if (boxIdxs) {
+        boxIdxs.slice(0, 2).forEach((bi, ring) => {
+          const ringC = svgEl('circle', { cx, cy, r: r + 5 + ring * 7 });
+          ringC.style.fill = 'none';
+          ringC.style.stroke = `var(--penta-box-${bi + 1})`;
+          ringC.style.strokeWidth = '5.5';
+          ringC.style.pointerEvents = 'none';
+          g.appendChild(ringC);
+        });
+      }
+
       // Text uvnitř kroužku — jméno noty + číslo oktávy
       const octaveNum = Math.floor(note.midi / 12) - 1;
       const fontSize = note.isRoot ? 22 : note.isActive ? 18 : 16;

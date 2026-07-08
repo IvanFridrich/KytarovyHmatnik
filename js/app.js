@@ -20,6 +20,7 @@ const defaultState = {
   nonLinearFrets: false,
   timbre:        'sine',
   colorMode:     'interval',  // 'interval' | 'tone'
+  pentaBox:      'none',      // pentatonický box: 'none' | '1'..'5' | 'all'
   playOctave:    3,           // cílová oktáva základního tónu (0–7)
   playDuration:  'normal',    // 'short' | 'normal' | 'long'
   livePlay:      false,       // živý náhled — akord hraje průběžně
@@ -34,7 +35,7 @@ const PERSISTED_KEYS = [
   'theme','instrument','tuningKey','customTuning','notation','accidentals',
   'fretCount','mode','rootChroma','chordKey','scaleKey','nonLinearFrets','timbre',
   'colorMode','playOctave','playDuration','livePlay','volume',
-  'composeMode','currentDur','currentDot','bassLine',
+  'composeMode','currentDur','currentDot','bassLine','pentaBox',
 ];
 
 // ─── Stav aplikace ────────────────────────────────────────────────────────────
@@ -311,11 +312,35 @@ function downloadMusicXML() {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+// ─── Pentatonické boxy ────────────────────────────────────────────────────────
+
+// Boxy dávají smysl jen ve standardním ladění (kytara i baskytara)
+function pentaBoxesAvailable() {
+  return state.mode === 'scale'
+    && !!Theory.PENTA_BOX_CORE[state.scaleKey]
+    && state.tuningKey === 'Standardní';
+}
+
+function computeBoxHighlight() {
+  if (!pentaBoxesAvailable() || state.pentaBox === 'none') return null;
+  const map = Theory.getPentatonicBoxes(state.tuningMidi, state.fretCount, state.rootChroma, state.scaleKey);
+  if (!map) return null;
+  if (state.pentaBox === 'all') return map;
+  const wanted = +state.pentaBox - 1;   // '1'..'5' → 0..4
+  const filtered = new Map();
+  for (const [key, idxs] of map) {
+    if (idxs.includes(wanted)) filtered.set(key, [wanted]);
+  }
+  return filtered;
+}
+
 // ─── Render ───────────────────────────────────────────────────────────────────
 
 function renderAll() {
   const fbSvg  = document.getElementById('fretboard-svg');
   const cofSvg = document.getElementById('cof-svg');
+
+  state.boxHighlight = computeBoxHighlight();
 
   if (fbSvg) {
     Render.renderFretboard(fbSvg, state, (midi) => {
@@ -533,6 +558,11 @@ function syncControls() {
   // Typy (data-value)
   setActiveBtn('chord-type-group', state.chordKey);
   setActiveBtn('scale-type-group', state.scaleKey);
+
+  // Pentatonické boxy — jen pentatoniky ve standardním ladění
+  const pentaSection = document.getElementById('penta-box-section');
+  if (pentaSection) pentaSection.hidden = !pentaBoxesAvailable();
+  setActiveBtn('penta-box-group', state.pentaBox);
 
   // Timbre
   setActiveBtn('timbre-group', state.timbre);
@@ -842,6 +872,12 @@ function bindEvents() {
   document.getElementById('scale-type-group')?.addEventListener('click', e => {
     const val = e.target.dataset.value;
     if (val) setState({ scaleKey: val });
+  });
+
+  // Pentatonický box
+  document.getElementById('penta-box-group')?.addEventListener('click', e => {
+    const val = e.target.dataset.value;
+    if (val) setState({ pentaBox: val });
   });
 
   // Téma

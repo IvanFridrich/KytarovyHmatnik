@@ -297,6 +297,75 @@ function selectVoicingMidi(fretboard, activeNotes, minFret = 0) {
   return [...found.values()];
 }
 
+// ─── Pentatonické boxy ────────────────────────────────────────────────────────
+
+// Jádro boxu je vždy 5 tónů; Bluesová používá moll pentatoniku, blue nota (b5)
+// se přidává dodatečně uvnitř okna boxu.
+const PENTA_BOX_CORE = {
+  'PentaDur':  [0, 2, 4, 7, 9],
+  'PentaMoll': [0, 3, 5, 7, 10],
+  'Bluesová':  [0, 3, 5, 7, 10],
+};
+
+// Vrátí Map<'struna:pražec', number[]> → indexy boxů 0–4 (box k začíná k-tým
+// stupněm stupnice na nejnižší struně; k=0 = základní tón = Box 1).
+// Dva tóny na strunu; pražce z reálných MIDI ladění (B-struna se posune sama).
+function getPentatonicBoxes(tuningMidi, fretCount, rootChroma, scaleKey) {
+  const core = PENTA_BOX_CORE[scaleKey];
+  if (!core || !tuningMidi.length) return null;
+
+  const chromas = core.map(i => (rootChroma + i) % 12);
+  const isBlues = scaleKey === 'Bluesová';
+  const blueChroma = (rootChroma + 6) % 12;
+
+  const map = new Map();
+  const add = (s, f, boxIdx) => {
+    if (f < 0 || f > fretCount) return;
+    const key = s + ':' + f;
+    const arr = map.get(key) || [];
+    if (!arr.includes(boxIdx)) { arr.push(boxIdx); map.set(key, arr); }
+  };
+
+  for (let k = 0; k < 5; k++) {
+    const walk = (startFret) => {
+      const notes = [];
+      let pitch = tuningMidi[0] + startFret;
+      let idx = k;
+      for (let s = 0; s < tuningMidi.length; s++) {
+        for (let n = 0; n < 2; n++) {
+          notes.push({ string: s, fret: pitch - tuningMidi[s] });
+          idx = (idx + 1) % 5;
+          pitch += ((chromas[idx] - midiToChroma(pitch)) + 12) % 12;
+        }
+      }
+      return notes;
+    };
+
+    let f0 = ((chromas[k] - midiToChroma(tuningMidi[0])) + 12) % 12;
+    let notes = walk(f0);
+    if (notes.some(n => n.fret < 0)) notes = walk(f0 + 12);
+
+    // Blue noty: všechny výskyty b5 v globálním okně boxu
+    if (isBlues) {
+      const frets = notes.map(n => n.fret);
+      const lo = Math.min(...frets), hi = Math.max(...frets);
+      for (let s = 0; s < tuningMidi.length; s++) {
+        for (let f = Math.max(0, lo); f <= hi; f++) {
+          if (midiToChroma(tuningMidi[s] + f) === blueChroma) notes.push({ string: s, fret: f });
+        }
+      }
+    }
+
+    // Zápis + opakování o oktávu výš, pokud se vejde
+    for (const n of notes) {
+      add(n.string, n.fret, k);
+      add(n.string, n.fret + 12, k);
+    }
+  }
+
+  return map;
+}
+
 // ─── Basová linka: délky, výška, dělení do taktů ──────────────────────────────
 
 // div = počet šestnáctin (divisions=4 na čtvrťovou); xml = MusicXML <type>; vf = VexFlow kód
@@ -470,4 +539,6 @@ const Theory = {
   KEY_SIGNATURES,
   keySigAlter,
   midiToNotated,
+  PENTA_BOX_CORE,
+  getPentatonicBoxes,
 };

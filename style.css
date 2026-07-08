@@ -76,6 +76,13 @@
   --tone-root-dk:  20%;
   --tone-active-l: 45%;
   --tone-ghost-l:  65%;
+
+  /* Pentatonické boxy — křiklavé barvy lemů 1–5 */
+  --penta-box-1: #ff1744;   /* neonová červená */
+  --penta-box-2: #ff9100;   /* zářivá oranžová */
+  --penta-box-3: #00c853;   /* neonová zelená */
+  --penta-box-4: #2962ff;   /* zářivá modrá */
+  --penta-box-5: #d500f9;   /* neonová purpurová */
 }
 
 /* ─── Tmavé téma ─────────────────────────────────────────────────────────── */
@@ -140,6 +147,13 @@
   --tone-root-dk:  48%;
   --tone-active-l: 55%;
   --tone-ghost-l:  42%;
+
+  /* Pentatonické boxy — neonové lemy pro tmavé pozadí */
+  --penta-box-1: #ff5252;
+  --penta-box-2: #ffab40;
+  --penta-box-3: #69f0ae;
+  --penta-box-4: #538bff;
+  --penta-box-5: #e040fb;
 }
 
 /* ─── Reset & základy ─────────────────────────────────────────────────────── */
